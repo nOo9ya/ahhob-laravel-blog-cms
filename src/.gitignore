@@ -34,6 +34,6 @@ npm-debug.log
 yarn-error.log
 /auth.json
 
-.env
-.env.backup
-.env.production
+!.env
+!.env.backup
+!.env.production
