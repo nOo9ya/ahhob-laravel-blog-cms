@@ -7,6 +7,11 @@ COPY --from=node /usr/local/lib /usr/local/lib
 COPY --from=node /usr/local/include /usr/local/include
 COPY --from=node /usr/local/bin /usr/local/bin
 
+# node 바이너리 및 관련 모듈만 복사
+#COPY --from=node /usr/local/bin/node /usr/local/bin/node
+#COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+
+
 ENV WORK_DIR=/var/www
 ENV UID=1000
 ENV GID=1000
@@ -27,6 +32,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # 알파인 리눅스의 다이얼아웃 그룹은 맥OS 그룹의 gid와 충돌하여 그룹삭제
 RUN delgroup dialout
+
 
 # php-fpm 사용자 변경
 #RUN sed -i "s/user = www-data/user = '${USER}'/g" /usr/local/etc/php-fpm.d/www.conf
@@ -49,7 +55,6 @@ RUN apk add --update --no-cache \
     libzip-dev  \
     unzip \
     zlib-dev \
-    libmcrypt-dev \
     libgsasl-dev \
     libxml2-dev \
     openssl-dev \
@@ -121,14 +126,14 @@ RUN docker-php-ext-install \
 RUN docker-php-ext-enable pdo_sqlite
 
 # Add xdebug
-RUN apk add --no-cache linux-headers \
-	&& apk add --update --no-cache --virtual .build-dependencies $PHPIZE_DEPS\
-	&& pecl install xdebug \
-	&& docker-php-ext-enable xdebug \
-	&& pecl clear-cache \
-	&& apk del .build-dependencies
-
-COPY ./.docker/php/xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
+#RUN apk add --no-cache linux-headers \
+#	&& apk add --update --no-cache --virtual .build-dependencies $PHPIZE_DEPS\
+#	&& pecl install xdebug \
+#	&& docker-php-ext-enable xdebug \
+#	&& pecl clear-cache \
+#	&& apk del .build-dependencies
+#
+#COPY ./.docker/php/xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
 
 # App permission check
 RUN mkdir -p ${WORK_DIR}/storage/logs \
@@ -152,15 +157,22 @@ RUN curl -sLS https://getcomposer.org/installer | php -- --install-dir=/usr/bin/
 #####################################
 # Laravel Schedule Cron Job:
 #####################################
-#RUN echo "* * * * * ${USER} /usr/local/bin/php ${WORK_DIR}/artisan schedule:run >> /dev/null 2>&1"  >> /var/spool/cron/crontabs/laravel-scheduler
-#RUN chmod 0644 /var/spool/cron/crontabs/laravel-scheduler
+RUN echo "* * * * * ${USER} /usr/local/bin/php ${WORK_DIR}/artisan schedule:run >> /dev/null 2>&1"  >> /var/spool/cron/crontabs/laravel-scheduler
+RUN chmod 0644 /var/spool/cron/crontabs/laravel-scheduler
 
 #####################################
 # initailization Start
 #####################################
 # Install Cron
-RUN apk add --update --no-cache dcron logrotate;
-RUN touch /var/log/cron.log
+RUN apk add --update --no-cache dcron supervisor logrotate;
+RUN touch /var/log/cron.log &&\
+    mkdir /var/log/supervisor &&\
+    touch /var/log/supervisor/supervisord.log
+
+COPY ./.docker/php/logrotate/supervisor_log.conf /etc/logrotate.d/supervisor
+COPY ./.docker/php/logrotate/laravel-worker_log.conf /etc/logrotate.d/laravel-worker
+COPY ./.docker/php/$PHP_VERSION/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+RUN chmod +x /etc/supervisor/conf.d/supervisord.conf
 
 COPY ./.docker/php/$PHP_VERSION/start-service.sh /usr/local/bin/start-service.sh
 RUN chmod +x /usr/local/bin/start-service.sh

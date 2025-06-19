@@ -61,7 +61,8 @@ if [ -f "${WORK_DIR}/artisan" ]; then
     else
       echo "Starting Node.js development server..."
       # 5173 포트(vite), 3000/4000 등은 프론트 dev 서버 포트에 맞게 조정
-      npm run dev --prefix "${WORK_DIR}" &
+      # npm run dev --prefix "${WORK_DIR}" -- --port 3000 --host 0.0.0.0 &
+      npm run dev -- --port 4000 --host &
     fi
   else
     echo "package.json not found, skipping Node.js setup."
@@ -80,8 +81,18 @@ if [ -f "${WORK_DIR}/artisan" ]; then
 else
   echo "not found artisan file!!!!!!!"
   echo "You must have Laravel installed"
-  tail -f /dev/null
+  # php-fpm을 실행하지 않고 종료되도록 하거나, 에러 상태로 종료되도록 할 수 있습니다.
+    # 여기서는 php-fpm을 실행하지 않고 tail -f /dev/null로 넘어가지 않도록 exit 1을 추가하는 것을 고려할 수 있습니다.
+    # exit 1
+    tail -f /dev/null # artisan 파일이 없을 경우에도 컨테이너가 유지되도록 하려면 이 줄을 유지
 fi
 
-# tail -f /dev/null로 컨테이너가 바로 종료되지 않도록 유지
-tail -f /dev/null
+# PHP-FPM 실행
+echo "Starting PHP-FPM..."
+php-fpm
+
+# tail -f /dev/null로 컨테이너가 바로 종료되지 않도록 유지 (php-fpm이 foreground로 실행되지 않는 경우 필요)
+# php-fpm이 foreground로 실행된다면 이 tail -f는 필요 없을 수 있습니다.
+# 대부분의 php-fpm Docker 이미지는 php-fpm을 foreground로 실행하므로,
+# 아래 tail -f는 주석 처리하거나 제거해도 될 가능성이 높습니다.
+# tail -f /dev/null
