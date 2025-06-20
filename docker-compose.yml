@@ -2,13 +2,13 @@ services:
     nginx:
         container_name: nginx
 #        image: nginx:1.25-alpine
+#        user: "${UID}:${GID}"
         build:
             context: .
             dockerfile: ./.docker/nginx/Dockerfile
             args:
                 - UID=${UID:-1000}
                 - GID=${GID:-1000}
-                - USER=${USER:-noo9ya}
                 - TZ=${TZ:-Asia/Seoul}
         restart: unless-stopped
         ports:
@@ -43,12 +43,15 @@ services:
 
     php:
         container_name: php
+        # docker exec -it -u noo9ya php sh
         build:
             context: .
             dockerfile: ./.docker/php/8.3/Dockerfile
             args:
                 - APP_ENV=dev
                 - WORK_DIR=/var/www
+                - UID=${UID:-1000}
+                - GID=${GID:-1000}
                 - TZ=${TZ:-Asia/Seoul}
         restart: unless-stopped
         ports:

@@ -15,7 +15,7 @@ COPY --from=node /usr/local/bin /usr/local/bin
 ENV WORK_DIR=/var/www
 ENV UID=1000
 ENV GID=1000
-ENV USER=www-data
+ENV USER=noo9ya
 ENV TZ=Asia/Seoul
 
 ENV PHP_VERSION=8.3
@@ -116,7 +116,7 @@ RUN docker-php-ext-enable imagick
 #RUN docker-php-ext-install pdo_pgsql pgsql
 
 # Debug install
-# Add sqlite
+# Add sqlite, icu, ctype, pdo_sqlite
 RUN apk add --no-cache sqlite-libs
 RUN apk add --no-cache icu sqlite
 RUN apk add --no-cache --virtual .build-deps sqlite-dev curl-dev
@@ -135,16 +135,12 @@ RUN docker-php-ext-enable pdo_sqlite
 #
 #COPY ./.docker/php/xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
 
-# App permission check
+# App permission용 디렉토리 생성(권한 변경은 start-service.sh에서 수행)
 RUN mkdir -p ${WORK_DIR}/storage/logs \
     ${WORK_DIR}/storage/framework \
     ${WORK_DIR}/storage/framework/cache \
     ${WORK_DIR}/storage/framework/cache/data \
     ${WORK_DIR}/bootstrap/cache
-
-RUN chown -R ${USER}:${USER} ${WORK_DIR}/storage/framework/cache/data
-RUN chown -R ${USER}:${USER} ${WORK_DIR}/storage/logs
-RUN chown -R ${USER}:${USER} ${WORK_DIR}/bootstrap/cache
 
 RUN chmod 755 -R ${WORK_DIR}/storage/*
 RUN chmod 755 -R ${WORK_DIR}/bootstrap/cache
@@ -180,7 +176,10 @@ RUN chmod +x /usr/local/bin/start-service.sh
 RUN rm -rf /var/cache/apk/* && rm -rf /tmp/pear
 RUN apk del --purge autoconf g++ make || true
 
-ENTRYPOINT ["start-service.sh"]
+# 1000:1000의 www-data 유저/그룹 생성
+RUN addgroup -g $GID $USER && adduser -D -u $UID -G $USER $USER
 
 EXPOSE 9000
+
+ENTRYPOINT ["start-service.sh"]
 CMD ["php-fpm"]

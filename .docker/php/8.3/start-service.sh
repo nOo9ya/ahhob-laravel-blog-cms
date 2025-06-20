@@ -2,10 +2,21 @@
 
 set -e
 
+# 1. 권한 및 소유자 변경 (컨테이너 런타임에 한번 더 보장)
+chown -R ${USER}:${USER} ${WORK_DIR}/storage/framework/cache/data || true
+chown -R ${USER}:${USER} ${WORK_DIR}/storage/logs || true
+chown -R ${USER}:${USER} ${WORK_DIR}/bootstrap/cache || true
+
+chmod 755 -R ${WORK_DIR}/storage/* || true
+chmod 755 -R ${WORK_DIR}/bootstrap/cache || true
+
+# 2. crond 시작 (백그라운드)
 crond
 
+# 3. Laravel/Node 관련 작업 (artisan이 있을 때만)
 if [ -f "${WORK_DIR}/artisan" ]; then
 
+  # storage/public 링크 재생성
   if [ -f "${WORK_DIR}/public/storage" ]; then
     unlink ${WORK_DIR}/public/storage
     ln -s ${WORK_DIR}/storage/app/public/ ${WORK_DIR}/public/storage
@@ -15,7 +26,7 @@ if [ -f "${WORK_DIR}/artisan" ]; then
 #    php artisan storage:link
 #  fi
 
-
+  # Composer install 및 Autoload
   if [ "prod" = "$APP_ENV" ]; then
     echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
     echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> production php service container start"
@@ -89,7 +100,7 @@ fi
 
 # PHP-FPM 실행
 echo "Starting PHP-FPM..."
-php-fpm
+exec php-fpm
 
 # tail -f /dev/null로 컨테이너가 바로 종료되지 않도록 유지 (php-fpm이 foreground로 실행되지 않는 경우 필요)
 # php-fpm이 foreground로 실행된다면 이 tail -f는 필요 없을 수 있습니다.
