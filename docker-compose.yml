@@ -6,9 +6,9 @@ services:
             context: .
             dockerfile: ./.docker/nginx/Dockerfile
             args:
-                - UID=${UID:-82}
-                - GID=${GID:-82}
-                - USER=${USER:-www-data}
+                - UID=${UID:-1000}
+                - GID=${GID:-1000}
+                - USER=${USER:-noo9ya}
                 - TZ=${TZ:-Asia/Seoul}
         restart: unless-stopped
         ports:
