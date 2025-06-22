@@ -1,11 +1,14 @@
 <?php
 
-namespace App\Http\Controllers\Ahhob\Blog;
+namespace App\Http\Controllers\Ahhob\Web\Blog;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
+use App\Models\Post;
+use App\Models\Tag;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
-use \Illuminate\Foundation\Application;
+use Illuminate\Foundation\Application;
 
 class HomeController extends Controller
 {
