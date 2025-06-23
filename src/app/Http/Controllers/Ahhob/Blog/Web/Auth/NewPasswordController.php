@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Ahhob\Web\Auth;
+namespace App\Http\Controllers\Ahhob\Blog\Web\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;

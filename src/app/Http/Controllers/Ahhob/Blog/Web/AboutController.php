@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Ahhob\Web\Blog;
+namespace App\Http\Controllers\Ahhob\Blog\Web;
 
 use App\Http\Controllers\Controller;
 use Illuminate\View\View;

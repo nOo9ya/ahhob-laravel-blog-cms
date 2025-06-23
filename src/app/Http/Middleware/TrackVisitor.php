@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\PostView;
+use App\Models\Blog\PostView;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;

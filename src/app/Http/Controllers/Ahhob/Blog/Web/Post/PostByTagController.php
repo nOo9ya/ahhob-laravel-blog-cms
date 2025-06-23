@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\Ahhob\Web\Blog\Post;
+namespace App\Http\Controllers\Ahhob\Blog\Web\Post;
 
 use App\Http\Controllers\Controller;
-use App\Models\Tag;
+use App\Models\Blog\Tag;
 use Illuminate\View\View;
 
 /**
@@ -14,7 +14,7 @@ class PostByTagController extends Controller
     /**
      * Handle the incoming request.
      *
-     * @param  \App\Models\Tag  $tag
+     * @param  \App\Models\Blog\Tag  $tag
      * @return \Illuminate\View\View
      */
     public function __invoke(Tag $tag): View

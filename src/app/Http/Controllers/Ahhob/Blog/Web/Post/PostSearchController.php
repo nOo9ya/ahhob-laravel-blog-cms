@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\Ahhob\Web\Blog\Post;
+namespace App\Http\Controllers\Ahhob\Blog\Web\Post;
 
 use App\Http\Controllers\Controller;
-use App\Models\Post;
+use App\Models\Blog\Post;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 

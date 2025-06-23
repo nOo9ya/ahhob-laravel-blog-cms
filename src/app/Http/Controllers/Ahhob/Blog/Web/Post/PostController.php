@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Http\Controllers\Ahhob\Web\Blog\Post;
+namespace App\Http\Controllers\Ahhob\Blog\Web\Post;
 
 use App\Http\Controllers\Controller;
-use App\Models\Category;
-use App\Models\Post;
-use App\Models\Tag;
+use App\Models\Blog\Category;
+use App\Models\Blog\Post;
+use App\Models\Blog\Tag;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;

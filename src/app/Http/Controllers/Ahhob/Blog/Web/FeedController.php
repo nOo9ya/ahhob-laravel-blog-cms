@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\Ahhob\Web\Blog;
+namespace App\Http\Controllers\Ahhob\Blog\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Post;
+use App\Models\Blog\Post;
 use Illuminate\Http\Response;
 
 class FeedController extends Controller

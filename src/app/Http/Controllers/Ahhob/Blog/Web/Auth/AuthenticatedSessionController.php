@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Http\Controllers\Ahhob\Web\Auth;
+namespace App\Http\Controllers\Ahhob\Blog\Web\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Web\Auth\LoginRequest;
+use App\Http\Requests\Blog\Web\Auth\LoginRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
