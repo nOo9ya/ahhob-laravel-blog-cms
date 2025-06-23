@@ -14,8 +14,8 @@ class PostByTagController extends Controller
     /**
      * Handle the incoming request.
      *
-     * @param  \App\Models\Blog\Tag  $tag
-     * @return \Illuminate\View\View
+     * @param Tag $tag
+     * @return View
      */
     public function __invoke(Tag $tag): View
     {
@@ -24,6 +24,9 @@ class PostByTagController extends Controller
             ->orderBy('published_at', 'desc')
             ->paginate(config('ahhob.pagination.per_page'));
 
-        return view('web.post.by-tag', compact('posts', 'tag'));
+        return view('web.post.by-tag', compact(
+            'posts',
+            'tag'
+        ));
     }
 }

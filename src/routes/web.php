@@ -1,16 +1,18 @@
 <?php
 
-use App\Http\Controllers\Ahhob\Web\Auth\AuthenticatedSessionController;
-use App\Http\Controllers\Ahhob\Web\Auth\NewPasswordController;
-use App\Http\Controllers\Ahhob\Web\Auth\PasswordResetLinkController;
-use App\Http\Controllers\Ahhob\Web\Auth\ProfileController;
-use App\Http\Controllers\Ahhob\Web\Auth\RegisteredUserController;
-use App\Http\Controllers\Ahhob\Web\Blog\HomeController;
-use App\Http\Controllers\Ahhob\Web\Blog\Post\PostController;
-use App\Http\Controllers\Ahhob\Web\Blog\Post\PostLikeController;
-use App\Http\Controllers\Ahhob\Web\Blog\Post\PostSearchController;
-use App\Http\Controllers\Ahhob\Web\Blog\Category\CategoryController;
-use App\Http\Controllers\Ahhob\Web\Blog\Comment\CommentController;
+
+use App\Http\Controllers\Ahhob\Blog\Web\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Ahhob\Blog\Web\Auth\NewPasswordController;
+use App\Http\Controllers\Ahhob\Blog\Web\Auth\PasswordResetLinkController;
+use App\Http\Controllers\Ahhob\Blog\Web\Auth\ProfileController;
+use App\Http\Controllers\Ahhob\Blog\Web\Auth\RegisteredUserController;
+use App\Http\Controllers\Ahhob\Blog\Web\HomeController;
+use App\Http\Controllers\Ahhob\Blog\Web\Category\CategoryController;
+use App\Http\Controllers\Ahhob\Blog\Web\Post\CommentController;
+use App\Http\Controllers\Ahhob\Blog\Web\Post\PostByTagController;
+use App\Http\Controllers\Ahhob\Blog\Web\Post\PostController;
+use App\Http\Controllers\Ahhob\Blog\Web\Post\PostLikeController;
+use App\Http\Controllers\Ahhob\Blog\Web\Post\PostSearchController;
 use Illuminate\Support\Facades\Route;
 
 // 홈 및 기본 페이지
@@ -18,6 +20,10 @@ Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/about', [HomeController::class, 'about'])->name('about');
 Route::get('/contact', [HomeController::class, 'contact'])->name('contact');
 Route::post('/contact', [HomeController::class, 'sendContact'])->name('contact.send');
+
+// RSS 피드
+Route::get('/feed', [HomeController::class, 'feed'])->name('feed');
+Route::get('/sitemap.xml', [HomeController::class, 'sitemap'])->name('sitemap');
 
 // 인증 라우트
 // 인증 관련 라우트
@@ -82,9 +88,3 @@ Route::prefix('comments')->name('comments.')->middleware('throttle:10,1')->group
     Route::post('/', [CommentController::class, 'store'])->name('store')->middleware(['throttle:10,1', 'anti.spam']);
     Route::post('/{comment}/like', [CommentController::class, 'like'])->name('like')->middleware('auth');
 });
-
-
-
-// RSS 피드
-Route::get('/feed', [HomeController::class, 'feed'])->name('feed');
-Route::get('/sitemap.xml', [HomeController::class, 'sitemap'])->name('sitemap');

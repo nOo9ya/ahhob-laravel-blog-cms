@@ -9,12 +9,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
 class Post extends Model
 {
     use HasFactory, SoftDeletes;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
         'title',
         'slug',
@@ -43,6 +49,11 @@ class Post extends Model
         'published_at',
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
     protected $casts = [
         'meta_keywords' => 'array',
         'is_featured' => 'boolean',
@@ -56,6 +67,11 @@ class Post extends Model
         'published_at' => 'datetime',
     ];
 
+    /**
+     * The attributes that should be mutated to dates.
+     *
+     * @var array
+     */
     protected $dates = [
         'published_at',
         'created_at',
@@ -64,12 +80,63 @@ class Post extends Model
     ];
 
     /**
+     * The "booted" method of the model.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // 생성될 때
+        static::creating(function ($post) {
+            if (empty($post->slug)) {
+                $post->generateSlug();
+            }
+        });
+
+        // 생성된 후
+        static::created(function ($post) {
+            $post->generateExcerpt();
+            $post->calculateReadingTime();
+        });
+
+        // 업데이트될 때
+        static::updating(function ($post) {
+            if ($post->isDirty('title') && empty($post->slug)) {
+                $post->generateSlug();
+            }
+
+            if ($post->isDirty('content')) {
+                $post->generateExcerpt();
+                $post->calculateReadingTime();
+            }
+        });
+
+        // 삭제될 때 관련 데이터 정리
+        static::deleting(function ($post) {
+            // 댓글도 함께 삭제
+            $post->comments()->delete();
+
+            // 조회 기록도 삭제
+            $post->views()->delete();
+
+            // 태그 관계 해제
+            $post->tags()->detach();
+        });
+    }
+
+    /**
      * 라우트 모델 바인딩에서 slug 사용
      */
     public function getRouteKeyName(): string
     {
         return 'slug';
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
 
     /**
      * 게시물 작성자
@@ -120,6 +187,20 @@ class Post extends Model
     }
 
     /**
+     * 이 포스트에 '좋아요'를 누른 사용자들
+     */
+    public function likers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'post_user')->withTimestamps();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scopes
+    |--------------------------------------------------------------------------
+    */
+
+    /**
      * 공개된 게시물만 조회
      */
     public function scopePublished($query)
@@ -161,6 +242,12 @@ class Post extends Model
         return $query->orderBy('views_count', 'desc')->limit($limit);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Accessors & Mutators
+    |--------------------------------------------------------------------------
+    */
+
     /**
      * SEO 메타 제목 (없으면 기본 제목 사용)
      */
@@ -193,6 +280,12 @@ class Post extends Model
     {
         return $this->attributes['og_description'] ?: $this->meta_description;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Public Methods
+    |--------------------------------------------------------------------------
+    */
 
     /**
      * 읽기 시간 계산 (단어 수 기준)
@@ -257,47 +350,19 @@ class Post extends Model
     }
 
     /**
-     * 모델 이벤트
+     * 현재 인증된 사용자가 이 포스트를 좋아하는지 확인합니다.
      */
-    protected static function boot()
+    public function isLikedByCurrentUser(): bool
     {
-        parent::boot();
+        if (!Auth::check()) {
+            return false;
+        }
 
-        // 생성될 때
-        static::creating(function ($post) {
-            if (empty($post->slug)) {
-                $post->generateSlug();
-            }
-        });
+        // 'likers' 관계가 이미 로드되었는지 확인하여 불필요한 쿼리를 방지합니다.
+        if ($this->relationLoaded('likers')) {
+            return $this->likers->contains(Auth::user());
+        }
 
-        // 생성된 후
-        static::created(function ($post) {
-            $post->generateExcerpt();
-            $post->calculateReadingTime();
-        });
-
-        // 업데이트될 때
-        static::updating(function ($post) {
-            if ($post->isDirty('title') && empty($post->slug)) {
-                $post->generateSlug();
-            }
-
-            if ($post->isDirty('content')) {
-                $post->generateExcerpt();
-                $post->calculateReadingTime();
-            }
-        });
-
-        // 삭제될 때 관련 데이터 정리
-        static::deleting(function ($post) {
-            // 댓글도 함께 삭제
-            $post->comments()->delete();
-
-            // 조회 기록도 삭제
-            $post->views()->delete();
-
-            // 태그 관계 해제
-            $post->tags()->detach();
-        });
+        return $this->likers()->where('user_id', Auth::id())->exists();
     }
 }

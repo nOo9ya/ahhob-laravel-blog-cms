@@ -15,25 +15,33 @@ class PostLikeController extends Controller
     /**
      * Handle the incoming request.
      *
-     * @param  \App\Models\Blog\Post  $post
-     * @return \Illuminate\Http\RedirectResponse
+     * @param Post $post
+     * @return RedirectResponse
      */
     public function __invoke(Post $post): RedirectResponse
     {
+        // 미들웨어로 처리하는 것이 더 좋지만, 컨트롤러 레벨에서도 방어 코드를 유지합니다.
         if (!Auth::check()) {
             return back()->with('error', '로그인이 필요합니다.');
         }
 
         $user = Auth::user();
 
-        // 개선 제안: 실제 서비스에서는 사용자가 중복으로 '좋아요'를 누를 수 없도록
-        // User와 Post 사이에 many-to-many 관계(예: post_user_likes 테이블)를 설정하고
-        // toggle() 메소드를 사용하는 것이 좋습니다.
-        // 예: $user->likedPosts()->toggle($post->id);
+        // toggle 메소드는 관계를 추가하거나(attach) 제거(detach)합니다.
+        // 결과로 ['attached' => [...], 'detached' => [...]] 배열을 반환합니다.
+        $result = $user->likedPosts()->toggle($post->id);
 
-        // 현재 로직 유지: likes_count만 증가
-        $post->increment('likes_count');
+        // 'likes_count' 컬럼을 동기화합니다.
+        if (!empty($result['attached'])) {
+            // 좋아요를 눌렀을 때
+            $post->increment('likes_count');
+            $message = '좋아요를 눌렀습니다.';
+        } else {
+            // 좋아요를 취소했을 때
+            $post->decrement('likes_count');
+            $message = '좋아요를 취소했습니다.';
+        }
 
-        return back()->with('success', '좋아요를 눌렀습니다.');
+        return back()->with('success', $message);
     }
 }

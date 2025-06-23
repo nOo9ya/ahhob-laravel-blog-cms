@@ -13,6 +13,11 @@ class Comment extends Model
 {
     use HasFactory, SoftDeletes;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
         'post_id',
         'user_id',
@@ -33,6 +38,11 @@ class Comment extends Model
         'approved_by',
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
     protected $casts = [
         'depth' => 'integer',
         'likes_count' => 'integer',
@@ -40,6 +50,53 @@ class Comment extends Model
         'is_pinned' => 'boolean',
         'approved_at' => 'datetime',
     ];
+
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // 생성될 때 경로 설정
+        static::created(function ($comment) {
+            if ($comment->parent_id) {
+                $parent = $comment->parent;
+                $comment->path = $parent->path ? $parent->path . '/' . $comment->id : (string) $comment->id;
+                $comment->depth = $parent->depth + 1;
+                $comment->saveQuietly();
+
+                // 부모 댓글의 대댓글 수 증가
+                $parent->increment('replies_count');
+            } else {
+                $comment->path = (string) $comment->id;
+                $comment->depth = 0;
+                $comment->saveQuietly();
+            }
+        });
+
+        // 삭제될 때
+        static::deleting(function ($comment) {
+            // 자식 댓글들도 함께 삭제
+            $comment->children()->delete();
+
+            // 부모 댓글의 대댓글 수 감소
+            if ($comment->parent) {
+                $comment->parent->decrement('replies_count');
+            }
+
+            // 승인된 댓글이었다면 게시물 댓글 수 감소
+            if ($comment->status === 'approved') {
+                $comment->post->decrement('comments_count');
+            }
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
 
     /**
      * 댓글이 속한 게시물
@@ -89,6 +146,12 @@ class Comment extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Scopes
+    |--------------------------------------------------------------------------
+    */
+
     /**
      * 승인된 댓글만 조회
      */
@@ -120,6 +183,34 @@ class Comment extends Model
     {
         return $query->where('depth', $depth);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Accessors & Mutators
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * 댓글 작성자 이름 (회원/비회원 구분)
+     */
+    public function getAuthorNameAttribute(): string
+    {
+        return $this->user ? $this->user->name : $this->attributes['author_name'];
+    }
+
+    /**
+     * 댓글 작성자 이메일 (회원/비회원 구분)
+     */
+    public function getAuthorEmailAttribute(): string
+    {
+        return $this->user ? $this->user->email : $this->attributes['author_email'];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Public Methods
+    |--------------------------------------------------------------------------
+    */
 
     /**
      * 댓글 승인
@@ -163,22 +254,6 @@ class Comment extends Model
     }
 
     /**
-     * 댓글 작성자 이름 (회원/비회원 구분)
-     */
-    public function getAuthorNameAttribute(): string
-    {
-        return $this->user ? $this->user->name : $this->attributes['author_name'];
-    }
-
-    /**
-     * 댓글 작성자 이메일 (회원/비회원 구분)
-     */
-    public function getAuthorEmailAttribute(): string
-    {
-        return $this->user ? $this->user->email : $this->attributes['author_email'];
-    }
-
-    /**
      * 댓글이 회원 댓글인지 확인
      */
     public function isFromRegisteredUser(): bool
@@ -195,46 +270,5 @@ class Comment extends Model
 
         return $user->id === $this->user_id ||
             in_array($user->role, ['admin', 'writer']);
-    }
-
-    /**
-     * 모델 이벤트
-     */
-    protected static function boot()
-    {
-        parent::boot();
-
-        // 생성될 때 경로 설정
-        static::created(function ($comment) {
-            if ($comment->parent_id) {
-                $parent = $comment->parent;
-                $comment->path = $parent->path ? $parent->path . '/' . $comment->id : (string) $comment->id;
-                $comment->depth = $parent->depth + 1;
-                $comment->saveQuietly();
-
-                // 부모 댓글의 대댓글 수 증가
-                $parent->increment('replies_count');
-            } else {
-                $comment->path = (string) $comment->id;
-                $comment->depth = 0;
-                $comment->saveQuietly();
-            }
-        });
-
-        // 삭제될 때
-        static::deleting(function ($comment) {
-            // 자식 댓글들도 함께 삭제
-            $comment->children()->delete();
-
-            // 부모 댓글의 대댓글 수 감소
-            if ($comment->parent) {
-                $comment->parent->decrement('replies_count');
-            }
-
-            // 승인된 댓글이었다면 게시물 댓글 수 감소
-            if ($comment->status === 'approved') {
-                $comment->post->decrement('comments_count');
-            }
-        });
     }
 }

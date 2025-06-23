@@ -10,6 +10,11 @@ class Tag extends Model
 {
     use HasFactory;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
         'name',
         'slug',
@@ -19,10 +24,21 @@ class Tag extends Model
         'is_featured',
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
     protected $casts = [
         'posts_count' => 'integer',
         'is_featured' => 'boolean',
     ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
 
     /**
      * 해당 태그를 사용하는 게시물들
@@ -42,6 +58,12 @@ class Tag extends Model
             ->where('published_at', '<=', now());
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Scopes
+    |--------------------------------------------------------------------------
+    */
+
     /**
      * 인기 태그 조회 (포스트 수 기준)
      */
@@ -57,6 +79,12 @@ class Tag extends Model
     {
         return $query->where('is_featured', true);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Public Methods
+    |--------------------------------------------------------------------------
+    */
 
     /**
      * 포스트 수 업데이트

@@ -6,6 +6,7 @@ namespace App\Models;
 use App\Models\Blog\Comment;
 use App\Models\Blog\Post;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -16,6 +17,11 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
         'name',
         'username',
@@ -32,11 +38,21 @@ class User extends Authenticatable
         'last_login_at',
     ];
 
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var array<int, string>
+     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
     protected $casts = [
         'email_verified_at' => 'datetime',
         'last_login_at' => 'datetime',
@@ -51,6 +67,12 @@ class User extends Authenticatable
     {
         return 'username';
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
 
     /**
      * 작성한 게시물들
@@ -77,20 +99,18 @@ class User extends Authenticatable
     }
 
     /**
-     * 관리자인지 확인
+     * 사용자가 '좋아요'를 누른 포스트들
      */
-    public function isAdmin(): bool
+    public function likedPosts(): BelongsToMany
     {
-        return $this->role === 'admin';
+        return $this->belongsToMany(Post::class, 'post_user')->withTimestamps();
     }
 
-    /**
-     * 작성자인지 확인
-     */
-    public function isWriter(): bool
-    {
-        return in_array($this->role, ['admin', 'writer']);
-    }
+    /*
+    |--------------------------------------------------------------------------
+    | Scopes
+    |--------------------------------------------------------------------------
+    */
 
     /**
      * 활성 사용자만 조회
@@ -106,5 +126,27 @@ class User extends Authenticatable
     public function scopeByRole($query, string $role)
     {
         return $query->where('role', $role);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Public Methods
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * 관리자인지 확인
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * 작성자인지 확인
+     */
+    public function isWriter(): bool
+    {
+        return in_array($this->role, ['admin', 'writer']);
     }
 }

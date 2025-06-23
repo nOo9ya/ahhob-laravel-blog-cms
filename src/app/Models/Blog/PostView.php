@@ -11,6 +11,11 @@ class PostView extends Model
 {
     use HasFactory;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
         'post_id',
         'user_id',
@@ -22,6 +27,12 @@ class PostView extends Model
         'device_type',
         'browser',
     ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
 
     /**
      * 조회된 게시물
@@ -38,6 +49,12 @@ class PostView extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Scopes
+    |--------------------------------------------------------------------------
+    */
 
     /**
      * 특정 기간의 조회 기록
@@ -90,6 +107,12 @@ class PostView extends Model
         return $query->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Public Methods
+    |--------------------------------------------------------------------------
+    */
 
     /**
      * 고유 방문자 수 계산 (IP 기준)

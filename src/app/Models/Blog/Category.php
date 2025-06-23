@@ -12,6 +12,11 @@ class Category extends Model
 {
     use HasFactory, SoftDeletes;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
         'name',
         'slug',
@@ -26,12 +31,61 @@ class Category extends Model
         'sort_order',
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
     protected $casts = [
         'is_active' => 'boolean',
         'depth' => 'integer',
         'children_count' => 'integer',
         'sort_order' => 'integer',
     ];
+
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        // 생성될 때 경로 업데이트
+        static::created(function ($category) {
+            $category->updatePath();
+            if ($category->parent) {
+                $category->parent->updateChildrenCount();
+            }
+        });
+
+        // 업데이트될 때 경로 재계산 (parent_id 변경 시)
+        static::updated(function ($category) {
+            if ($category->wasChanged('parent_id')) {
+                $category->updatePath();
+
+                // 이전 부모와 새 부모의 children_count 업데이트
+                if ($category->getOriginal('parent_id')) {
+                    Category::find($category->getOriginal('parent_id'))->updateChildrenCount();
+                }
+                if ($category->parent) {
+                    $category->parent->updateChildrenCount();
+                }
+            }
+        });
+
+        // 삭제될 때 부모의 children_count 업데이트
+        static::deleted(function ($category) {
+            if ($category->parent) {
+                $category->parent->updateChildrenCount();
+            }
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Relationships
+    |--------------------------------------------------------------------------
+    */
 
     /**
      * 부모 카테고리 관계
@@ -67,6 +121,12 @@ class Category extends Model
         return $this->hasMany(Post::class);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Scopes
+    |--------------------------------------------------------------------------
+    */
+
     /**
      * 최상위 카테고리들만 조회
      */
@@ -90,6 +150,30 @@ class Category extends Model
     {
         return $query->where('depth', $depth);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Accessors & Mutators
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * 전체 경로명 가져오기 (부모 > 자식 형태)
+     */
+    public function getFullNameAttribute(): string
+    {
+        if (!$this->parent) {
+            return $this->name;
+        }
+
+        return $this->parent->full_name . ' > ' . $this->name;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Public Methods
+    |--------------------------------------------------------------------------
+    */
 
     /**
      * 계층 경로 업데이트
@@ -123,60 +207,10 @@ class Category extends Model
     }
 
     /**
-     * 전체 경로명 가져오기 (부모 > 자식 형태)
-     */
-    public function getFullNameAttribute(): string
-    {
-        if (!$this->parent) {
-            return $this->name;
-        }
-
-        return $this->parent->full_name . ' > ' . $this->name;
-    }
-
-    /**
      * 카테고리가 특정 카테고리의 하위인지 확인
      */
     public function isChildOf(Category $category): bool
     {
         return $this->path && str_starts_with($this->path, $category->path . '/');
-    }
-
-    /**
-     * 모델 이벤트
-     */
-    protected static function boot(): void
-    {
-        parent::boot();
-
-        // 생성될 때 경로 업데이트
-        static::created(function ($category) {
-            $category->updatePath();
-            if ($category->parent) {
-                $category->parent->updateChildrenCount();
-            }
-        });
-
-        // 업데이트될 때 경로 재계산 (parent_id 변경 시)
-        static::updated(function ($category) {
-            if ($category->wasChanged('parent_id')) {
-                $category->updatePath();
-
-                // 이전 부모와 새 부모의 children_count 업데이트
-                if ($category->getOriginal('parent_id')) {
-                    Category::find($category->getOriginal('parent_id'))->updateChildrenCount();
-                }
-                if ($category->parent) {
-                    $category->parent->updateChildrenCount();
-                }
-            }
-        });
-
-        // 삭제될 때 부모의 children_count 업데이트
-        static::deleted(function ($category) {
-            if ($category->parent) {
-                $category->parent->updateChildrenCount();
-            }
-        });
     }
 }
