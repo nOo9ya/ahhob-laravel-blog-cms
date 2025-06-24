@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Ahhob\Blog\Web\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Blog\Web\Auth\ProfileUpdateRequest;
+use App\Http\Requests\Ahhob\Blog\Web\Auth\ProfileUpdateRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
