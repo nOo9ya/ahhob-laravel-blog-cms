@@ -83,9 +83,10 @@ class Category extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | Relationships
+    | 관계 (Relationships)
     |--------------------------------------------------------------------------
     */
+    // region --- 관계 (Relationships) ---
 
     /**
      * 부모 카테고리 관계
@@ -121,11 +122,14 @@ class Category extends Model
         return $this->hasMany(Post::class);
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Scopes
+    | 쿼리 스코프 (Query Scopes)
     |--------------------------------------------------------------------------
     */
+    // region --- 쿼리 스코프 (Query Scopes) ---
 
     /**
      * 최상위 카테고리들만 조회
@@ -151,11 +155,14 @@ class Category extends Model
         return $query->where('depth', $depth);
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Accessors & Mutators
+    | 접근자 & 변경자 (Accessors & Mutators)
     |--------------------------------------------------------------------------
     */
+    // region --- 접근자 & 변경자 (Accessors & Mutators) ---
 
     /**
      * 전체 경로명 가져오기 (부모 > 자식 형태)
@@ -169,11 +176,14 @@ class Category extends Model
         return $this->parent->full_name . ' > ' . $this->name;
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Public Methods
+    | 공개 메서드 (Public Methods)
     |--------------------------------------------------------------------------
     */
+    // region --- 공개 메서드 (Public Methods) ---
 
     /**
      * 계층 경로 업데이트
@@ -213,4 +223,6 @@ class Category extends Model
     {
         return $this->path && str_starts_with($this->path, $category->path . '/');
     }
+
+    // endregion
 }

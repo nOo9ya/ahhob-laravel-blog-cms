@@ -94,9 +94,10 @@ class Comment extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | Relationships
+    | 관계 (Relationships)
     |--------------------------------------------------------------------------
     */
+    // region --- 관계 (Relationships) ---
 
     /**
      * 댓글이 속한 게시물
@@ -146,11 +147,14 @@ class Comment extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Scopes
+    | 쿼리 스코프 (Query Scopes)
     |--------------------------------------------------------------------------
     */
+    // region --- 쿼리 스코프 (Query Scopes) ---
 
     /**
      * 승인된 댓글만 조회
@@ -184,11 +188,15 @@ class Comment extends Model
         return $query->where('depth', $depth);
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Accessors & Mutators
+    | 접근자 & 변경자 (Accessors & Mutators)
     |--------------------------------------------------------------------------
     */
+    // region --- 접근자 & 변경자 (Accessors & Mutators) ---
+
 
     /**
      * 댓글 작성자 이름 (회원/비회원 구분)
@@ -206,11 +214,14 @@ class Comment extends Model
         return $this->user ? $this->user->email : $this->attributes['author_email'];
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Public Methods
+    | 공개 메서드 (Public Methods)
     |--------------------------------------------------------------------------
     */
+    // region --- 공개 메서드 (Public Methods) ---
 
     /**
      * 댓글 승인
@@ -271,4 +282,6 @@ class Comment extends Model
         return $user->id === $this->user_id ||
             in_array($user->role, ['admin', 'writer']);
     }
+
+    // endregion
 }

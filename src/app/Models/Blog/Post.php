@@ -134,9 +134,10 @@ class Post extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | Relationships
+    | 관계 (Relationships)
     |--------------------------------------------------------------------------
     */
+    // region --- 관계 (Relationships) ---
 
     /**
      * 게시물 작성자
@@ -194,11 +195,14 @@ class Post extends Model
         return $this->belongsToMany(User::class, 'post_user')->withTimestamps();
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Scopes
+    | 쿼리 스코프 (Query Scopes)
     |--------------------------------------------------------------------------
     */
+    // region --- 쿼리 스코프 (Query Scopes) ---
 
     /**
      * 공개된 게시물만 조회
@@ -242,11 +246,14 @@ class Post extends Model
         return $query->orderBy('views_count', 'desc')->limit($limit);
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Accessors & Mutators
+    | 접근자 & 변경자 (Accessors & Mutators)
     |--------------------------------------------------------------------------
     */
+    // region --- 접근자 & 변경자 (Accessors & Mutators) ---
 
     /**
      * SEO 메타 제목 (없으면 기본 제목 사용)
@@ -281,11 +288,14 @@ class Post extends Model
         return $this->attributes['og_description'] ?: $this->meta_description;
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Public Methods
+    | 공개 메서드 (Public Methods)
     |--------------------------------------------------------------------------
     */
+    // region --- 공개 메서드 (Public Methods) ---
 
     /**
      * 읽기 시간 계산 (단어 수 기준)
@@ -365,4 +375,6 @@ class Post extends Model
 
         return $this->likers()->where('user_id', Auth::id())->exists();
     }
+
+    // endregion
 }

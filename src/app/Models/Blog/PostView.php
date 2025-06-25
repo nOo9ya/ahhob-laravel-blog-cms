@@ -30,9 +30,10 @@ class PostView extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | Relationships
+    | 관계 (Relationships)
     |--------------------------------------------------------------------------
     */
+    // region --- 관계 (Relationships) ---
 
     /**
      * 조회된 게시물
@@ -50,11 +51,14 @@ class PostView extends Model
         return $this->belongsTo(User::class);
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Scopes
+    | 쿼리 스코프 (Query Scopes)
     |--------------------------------------------------------------------------
     */
+    // region --- 쿼리 스코프 (Query Scopes) ---
 
     /**
      * 특정 기간의 조회 기록
@@ -108,11 +112,14 @@ class PostView extends Model
             ->whereYear('created_at', now()->year);
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Public Methods
+    | 공개 메서드 (Public Methods)
     |--------------------------------------------------------------------------
     */
+    // region --- 공개 메서드 (Public Methods) ---
 
     /**
      * 고유 방문자 수 계산 (IP 기준)
@@ -141,4 +148,6 @@ class PostView extends Model
 
         return $query->distinct('ip_address')->count();
     }
+
+    // endregion
 }

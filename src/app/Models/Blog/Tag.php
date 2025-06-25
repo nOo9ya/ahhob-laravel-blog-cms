@@ -36,9 +36,10 @@ class Tag extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | Relationships
+    | 관계 (Relationships)
     |--------------------------------------------------------------------------
     */
+    // region --- 관계 (Relationships) ---
 
     /**
      * 해당 태그를 사용하는 게시물들
@@ -58,11 +59,14 @@ class Tag extends Model
             ->where('published_at', '<=', now());
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Scopes
+    | 쿼리 스코프 (Query Scopes)
     |--------------------------------------------------------------------------
     */
+    // region --- 쿼리 스코프 (Query Scopes) ---
 
     /**
      * 인기 태그 조회 (포스트 수 기준)
@@ -80,11 +84,14 @@ class Tag extends Model
         return $query->where('is_featured', true);
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Public Methods
+    | 공개 메서드 (Public Methods)
     |--------------------------------------------------------------------------
     */
+    // region --- 공개 메서드 (Public Methods) ---
 
     /**
      * 포스트 수 업데이트
@@ -94,4 +101,6 @@ class Tag extends Model
         $this->posts_count = $this->publishedPosts()->count();
         $this->saveQuietly();
     }
+
+    // endregion
 }

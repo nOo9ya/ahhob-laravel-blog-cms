@@ -70,9 +70,10 @@ class User extends Authenticatable
 
     /*
     |--------------------------------------------------------------------------
-    | Relationships
+    | 관계 (Relationships)
     |--------------------------------------------------------------------------
     */
+    // region --- 관계 (Relationships) ---
 
     /**
      * 작성한 게시물들
@@ -106,11 +107,14 @@ class User extends Authenticatable
         return $this->belongsToMany(Post::class, 'post_user')->withTimestamps();
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Scopes
+    | 쿼리 스코프 (Query Scopes)
     |--------------------------------------------------------------------------
     */
+    // region --- 쿼리 스코프 (Query Scopes) ---
 
     /**
      * 활성 사용자만 조회
@@ -128,11 +132,14 @@ class User extends Authenticatable
         return $query->where('role', $role);
     }
 
+    // endregion
+
     /*
     |--------------------------------------------------------------------------
-    | Public Methods
+    | 공개 메서드 (Public Methods)
     |--------------------------------------------------------------------------
     */
+    // region --- 공개 메서드 (Public Methods) ---
 
     /**
      * 관리자인지 확인
@@ -149,4 +156,6 @@ class User extends Authenticatable
     {
         return in_array($this->role, ['admin', 'writer']);
     }
+
+    // endregion
 }
