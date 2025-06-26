@@ -3,6 +3,7 @@
 namespace App\Models\Blog;
 
 use App\Models\User;
+use App\Services\Ahhob\Blog\Shared\MarkdownService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -57,6 +58,7 @@ class Page extends Model
         'title',
         'slug',
         'content',
+        'content_html',
         'status',
         'published_at',
         'meta_title',
@@ -113,10 +115,9 @@ class Page extends Model
                 $counter++;
             }
 
-            // 정렬 순서 자동 설정
-            if (is_null($page->sort_order)) {
-                $maxOrder = static::max('sort_order') ?? 0;
-                $page->sort_order = $maxOrder + 1;
+            // 마크다운을 HTML로 변환
+            if ($page->content && !$page->content_html) {
+                $page->convertMarkdownToHtml();
             }
         });
 
@@ -137,6 +138,11 @@ class Page extends Model
                     $page->slug = $originalSlug . '-' . $counter;
                     $counter++;
                 }
+            }
+
+            // 마크다운 내용이 변경되면 HTML 재변환
+            if ($page->isDirty('content')) {
+                $page->convertMarkdownToHtml();
             }
         });
     }
@@ -294,6 +300,25 @@ class Page extends Model
     public function isDraft(): bool
     {
         return $this->status === 'draft';
+    }
+
+    /**
+     * 마크다운을 HTML로 변환
+     */
+    public function convertMarkdownToHtml(): void
+    {
+        if (!empty($this->content)) {
+            $markdownService = app(MarkdownService::class);
+            $this->content_html = $markdownService->toHtml($this->content);
+        }
+    }
+
+    /**
+     * 렌더링된 HTML 콘텐츠 반환 (프론트엔드에서 사용)
+     */
+    public function getRenderedContent(): string
+    {
+        return $this->content_html ?: $this->content;
     }
 
     // endregion

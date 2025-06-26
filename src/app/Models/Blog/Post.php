@@ -3,11 +3,14 @@
 namespace App\Models\Blog;
 
 use App\Models\User;
+use App\Services\Ahhob\Blog\Shared\MarkdownService;
+use App\Services\Ahhob\Blog\Shared\CacheService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -26,6 +29,7 @@ class Post extends Model
         'slug',
         'excerpt',
         'content',
+        'content_html',
         'featured_image',
         'status',
         'user_id',
@@ -80,48 +84,17 @@ class Post extends Model
     ];
 
     /**
-     * The "booted" method of the model.
+     * 모델 부팅
+     * 
+     * Observer 패턴을 사용하여 이벤트 처리를 분리했습니다.
+     * 비즈니스 로직은 PostObserver에서 처리됩니다.
+     * 
+     * @see \App\Observers\Blog\PostObserver
      */
-    protected static function boot()
+    protected static function boot(): void
     {
         parent::boot();
-
-        // 생성될 때
-        static::creating(function ($post) {
-            if (empty($post->slug)) {
-                $post->generateSlug();
-            }
-        });
-
-        // 생성된 후
-        static::created(function ($post) {
-            $post->generateExcerpt();
-            $post->calculateReadingTime();
-        });
-
-        // 업데이트될 때
-        static::updating(function ($post) {
-            if ($post->isDirty('title') && empty($post->slug)) {
-                $post->generateSlug();
-            }
-
-            if ($post->isDirty('content')) {
-                $post->generateExcerpt();
-                $post->calculateReadingTime();
-            }
-        });
-
-        // 삭제될 때 관련 데이터 정리
-        static::deleting(function ($post) {
-            // 댓글도 함께 삭제
-            $post->comments()->delete();
-
-            // 조회 기록도 삭제
-            $post->views()->delete();
-
-            // 태그 관계 해제
-            $post->tags()->detach();
-        });
+        // Observer는 AppServiceProvider에서 등록됩니다.
     }
 
     /**
@@ -194,6 +167,42 @@ class Post extends Model
     {
         return $this->belongsToMany(User::class, 'post_user')->withTimestamps();
     }
+    
+    /**
+     * 게시물과 연결된 이미지들 (다형성 관계)
+     * 
+     * 이 관계는 다음과 같은 이미지들을 포함합니다:
+     * - 게시물 본문에 삽입된 콘텐츠 이미지
+     * - 대표 이미지(featured image)
+     * - Open Graph 이미지
+     * - 기타 게시물과 관련된 모든 이미지
+     * 
+     * @return MorphMany 이미지 컬렉션
+     */
+    public function images(): MorphMany
+    {
+        return $this->morphMany(Image::class, 'imageable');
+    }
+    
+    /**
+     * 게시물의 대표 이미지 (featured image)
+     * 
+     * @return MorphMany 대표 이미지만 필터링
+     */
+    public function featuredImages(): MorphMany
+    {
+        return $this->images()->where('alt_text', 'LIKE', '%featured%');
+    }
+    
+    /**
+     * 게시물 본문에 사용된 콘텐츠 이미지들
+     * 
+     * @return MorphMany 콘텐츠 이미지만 필터링
+     */
+    public function contentImages(): MorphMany
+    {
+        return $this->images()->whereNotNull('imageable_id')->where('imageable_id', '>', 0);
+    }
 
     // endregion
 
@@ -206,8 +215,11 @@ class Post extends Model
 
     /**
      * 공개된 게시물만 조회
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopePublished($query)
+    public function scopePublished(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('status', 'published')
             ->whereNotNull('published_at')
@@ -216,32 +228,47 @@ class Post extends Model
 
     /**
      * 추천 게시물만 조회
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeFeatured($query)
+    public function scopeFeatured(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('is_featured', true);
     }
 
     /**
      * 특정 상태의 게시물만 조회
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string $status
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeByStatus($query, string $status)
+    public function scopeByStatus(\Illuminate\Database\Eloquent\Builder $query, string $status): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('status', $status);
     }
 
     /**
      * 특정 사용자의 게시물만 조회
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param int $userId
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeByUser($query, int $userId)
+    public function scopeByUser(\Illuminate\Database\Eloquent\Builder $query, int $userId): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('user_id', $userId);
     }
 
     /**
      * 인기 게시물 (조회수 기준)
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param int $limit
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopePopular($query, int $limit = 10)
+    public function scopePopular(\Illuminate\Database\Eloquent\Builder $query, int $limit = 10): \Illuminate\Database\Eloquent\Builder
     {
         return $query->orderBy('views_count', 'desc')->limit($limit);
     }
@@ -286,6 +313,44 @@ class Post extends Model
     public function getOgDescriptionAttribute(): string
     {
         return $this->attributes['og_description'] ?: $this->meta_description;
+    }
+
+    // endregion
+
+    /*
+    |--------------------------------------------------------------------------
+    | 부팅 (Boot)
+    |--------------------------------------------------------------------------
+    */
+    // region --- 부팅 (Boot) ---
+
+
+    // endregion
+
+    /*
+    |--------------------------------------------------------------------------
+    | 캐시 관련 메서드
+    |--------------------------------------------------------------------------
+    */
+    // region --- 캐시 관련 메서드 ---
+
+    /**
+     * 게시물 관련 캐시 무효화
+     */
+    public function invalidateCache(): void
+    {
+        if (config('ahhob_blog.cache.auto_invalidate.on_post_save', true)) {
+            $cacheService = app(CacheService::class);
+            $cacheService->invalidatePosts();
+            
+            // 카테고리 변경된 경우 카테고리 캐시도 무효화
+            if ($this->isDirty('category_id')) {
+                $cacheService->invalidateCategories();
+            }
+            
+            // 정적 콘텐츠 캐시 무효화 (RSS, Sitemap 등)
+            $cacheService->invalidateByTags(['static']);
+        }
     }
 
     // endregion
@@ -374,6 +439,25 @@ class Post extends Model
         }
 
         return $this->likers()->where('user_id', Auth::id())->exists();
+    }
+
+    /**
+     * 마크다운을 HTML로 변환
+     */
+    public function convertMarkdownToHtml(): void
+    {
+        if (!empty($this->content)) {
+            $markdownService = app(MarkdownService::class);
+            $this->content_html = $markdownService->toHtml($this->content);
+        }
+    }
+
+    /**
+     * 렌더링된 HTML 콘텐츠 반환 (프론트엔드에서 사용)
+     */
+    public function getRenderedContent(): string
+    {
+        return $this->content_html ?: $this->content;
     }
 
     // endregion

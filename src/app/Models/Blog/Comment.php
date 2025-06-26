@@ -3,6 +3,7 @@
 namespace App\Models\Blog;
 
 use App\Models\User;
+use App\Services\Ahhob\Blog\Shared\CacheService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -52,32 +53,55 @@ class Comment extends Model
     ];
 
     /**
-     * The "booted" method of the model.
+     * 모델 부팅 - 이벤트 리스너 등록
+     * 
+     * 댓글 생성, 수정, 삭제 시 자동으로 실행되는 로직을 정의합니다.
+     * - 계층 구조 경로 자동 계산
+     * - 댓글 수 업데이트
+     * - 캐시 무효화
+     * - 부모-자식 관계 정리
      */
-    protected static function boot()
+    protected static function boot(): void
     {
         parent::boot();
 
-        // 생성될 때 경로 설정
-        static::created(function ($comment) {
-            if ($comment->parent_id) {
-                $parent = $comment->parent;
-                $comment->path = $parent->path ? $parent->path . '/' . $comment->id : (string) $comment->id;
-                $comment->depth = $parent->depth + 1;
-                $comment->saveQuietly();
+        // 생성 전 처리
+        static::creating(function (Comment $comment) {
+            // 캐시 무효화
+            $comment->invalidateCache();
+        });
 
-                // 부모 댓글의 대댓글 수 증가
-                $parent->increment('replies_count');
-            } else {
-                $comment->path = (string) $comment->id;
-                $comment->depth = 0;
-                $comment->saveQuietly();
+        // 생성 후 처리
+        static::created(function (Comment $comment) {
+            // 계층 구조 경로 설정
+            $comment->updatePath();
+            
+            // 부모 댓글의 대댓글 수 증가
+            if ($comment->parent) {
+                $comment->parent->increment('replies_count');
             }
         });
 
-        // 삭제될 때
-        static::deleting(function ($comment) {
-            // 자식 댓글들도 함께 삭제
+        // 수정 전 처리
+        static::updating(function (Comment $comment) {
+            // 캐시 무효화
+            $comment->invalidateCache();
+        });
+
+        // 수정 후 처리
+        static::updated(function (Comment $comment) {
+            // 상태가 변경된 경우 게시물 댓글 수 업데이트
+            if ($comment->wasChanged('status')) {
+                $comment->updatePostCommentsCount();
+            }
+        });
+
+        // 삭제 전 처리
+        static::deleting(function (Comment $comment) {
+            // 캐시 무효화
+            $comment->invalidateCache();
+            
+            // 자식 댓글들도 함께 삭제 (소프트 삭제)
             $comment->children()->delete();
 
             // 부모 댓글의 대댓글 수 감소
@@ -158,32 +182,45 @@ class Comment extends Model
 
     /**
      * 승인된 댓글만 조회
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeApproved($query)
+    public function scopeApproved(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('status', 'approved');
     }
 
     /**
      * 승인 대기 중인 댓글만 조회
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopePending($query)
+    public function scopePending(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('status', 'pending');
     }
 
     /**
      * 최상위 댓글만 조회 (대댓글 제외)
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeRoots($query)
+    public function scopeRoots(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         return $query->whereNull('parent_id');
     }
 
     /**
      * 특정 깊이의 댓글만 조회
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param int $depth 조회할 깊이
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeByDepth($query, int $depth)
+    public function scopeByDepth(\Illuminate\Database\Eloquent\Builder $query, int $depth): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('depth', $depth);
     }
@@ -281,6 +318,68 @@ class Comment extends Model
 
         return $user->id === $this->user_id ||
             in_array($user->role, ['admin', 'writer']);
+    }
+
+    /**
+     * 댓글 경로 업데이트 (계층 구조 관리)
+     * 
+     * @return void
+     */
+    public function updatePath(): void
+    {
+        if ($this->parent_id) {
+            $parent = $this->parent;
+            if ($parent) {
+                $this->path = $parent->path ? $parent->path . '/' . $this->id : (string) $this->id;
+                $this->depth = $parent->depth + 1;
+            }
+        } else {
+            $this->path = (string) $this->id;
+            $this->depth = 0;
+        }
+
+        $this->saveQuietly(); // 이벤트 트리거 없이 저장
+    }
+
+    /**
+     * 게시물의 댓글 수 업데이트
+     * 
+     * @return void
+     */
+    public function updatePostCommentsCount(): void
+    {
+        $originalStatus = $this->getOriginal('status');
+        $newStatus = $this->status;
+
+        // 승인됨 -> 다른 상태: 댓글 수 감소
+        if ($originalStatus === 'approved' && $newStatus !== 'approved') {
+            $this->post->decrement('comments_count');
+        }
+        // 다른 상태 -> 승인됨: 댓글 수 증가
+        elseif ($originalStatus !== 'approved' && $newStatus === 'approved') {
+            $this->post->increment('comments_count');
+        }
+    }
+
+    /**
+     * 댓글 관련 캐시 무효화
+     * 
+     * @return void
+     */
+    public function invalidateCache(): void
+    {
+        if (config('ahhob_blog.cache.auto_invalidate.on_comment_save', true)) {
+            $cacheService = app(CacheService::class);
+            
+            // 게시물 캐시 무효화 (댓글이 포함된 게시물)
+            $cacheService->invalidatePosts();
+            
+            // 댓글 관련 캐시 무효화
+            $cacheService->invalidateByTags(['comments']);
+            
+            // 정적 콘텐츠 캐시 무효화
+            $cacheService->invalidateByTags(['static']);
+        }
     }
 
     // endregion

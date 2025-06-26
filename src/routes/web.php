@@ -8,6 +8,7 @@ use App\Http\Controllers\Ahhob\Blog\Web\Auth\ProfileController;
 use App\Http\Controllers\Ahhob\Blog\Web\Auth\RegisteredUserController;
 use App\Http\Controllers\Ahhob\Blog\Web\HomeController;
 use App\Http\Controllers\Ahhob\Blog\Web\Category\CategoryController;
+use App\Http\Controllers\Ahhob\Blog\Web\Page\PageController;
 use App\Http\Controllers\Ahhob\Blog\Web\Post\CommentController;
 use App\Http\Controllers\Ahhob\Blog\Web\Post\PostByTagController;
 use App\Http\Controllers\Ahhob\Blog\Web\Post\PostController;
@@ -88,3 +89,6 @@ Route::prefix('comments')->name('comments.')->middleware('throttle:10,1')->group
     Route::post('/', [CommentController::class, 'store'])->name('store')->middleware(['throttle:10,1', 'anti.spam']);
     Route::post('/{comment}/like', [CommentController::class, 'like'])->name('like')->middleware('auth');
 });
+
+// 정적 페이지 라우트 (맨 마지막에 배치)
+Route::get('/pages/{page:slug}', [PageController::class, 'show'])->name('pages.show');

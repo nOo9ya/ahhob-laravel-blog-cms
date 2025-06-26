@@ -23,6 +23,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\RoleAuth::class,
             'track.visitor' => \App\Http\Middleware\TrackVisitor::class,
             'anti.spam' => \App\Http\Middleware\AntiSpam::class,
+            'jwt.auth' => \App\Http\Middleware\JwtAuthMiddleware::class,
+            'jwt.response' => \App\Http\Middleware\JwtResponseMiddleware::class,
+            'jwt.rate' => \App\Http\Middleware\JwtRateLimitMiddleware::class,
         ]);
 
         // middleware group
@@ -36,9 +39,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->group('api', [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \App\Http\Middleware\JwtResponseMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

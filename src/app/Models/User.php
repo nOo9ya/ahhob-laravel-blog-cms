@@ -11,11 +11,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
+use Tymon\JWTAuth\Contracts\JWTSubject;
 
-class User extends Authenticatable
+class User extends Authenticatable implements JWTSubject
 {
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use HasFactory, Notifiable, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -155,6 +155,41 @@ class User extends Authenticatable
     public function isWriter(): bool
     {
         return in_array($this->role, ['admin', 'writer']);
+    }
+
+    // endregion
+
+    /*
+    |--------------------------------------------------------------------------
+    | JWT 메서드 (JWT Methods)
+    |--------------------------------------------------------------------------
+    */
+    // region --- JWT 메서드 (JWT Methods) ---
+
+    /**
+     * JWT Subject 식별자 반환
+     * 
+     * @return mixed
+     */
+    public function getJWTIdentifier()
+    {
+        return $this->getKey();
+    }
+
+    /**
+     * JWT 커스텀 클레임 반환
+     * 
+     * @return array
+     */
+    public function getJWTCustomClaims(): array
+    {
+        return [
+            'role' => $this->role,
+            'username' => $this->username,
+            'email' => $this->email,
+            'name' => $this->name,
+            'is_active' => $this->is_active,
+        ];
     }
 
     // endregion

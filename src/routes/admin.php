@@ -6,6 +6,7 @@ use App\Http\Controllers\Ahhob\Blog\Admin\Auth\AuthController;
 use App\Http\Controllers\Ahhob\Blog\Admin\Dashboard\DashboardController;
 use App\Http\Controllers\Ahhob\Blog\Admin\Post\PostController;
 use App\Http\Controllers\Ahhob\Blog\Admin\Category\CategoryController;
+use App\Http\Controllers\Ahhob\Blog\Admin\Page\PageController;
 use App\Http\Controllers\Ahhob\Blog\Admin\Post\CommentController;
 use App\Http\Controllers\Ahhob\Blog\Admin\User\UserController;
 
@@ -38,7 +39,7 @@ Route::middleware(['auth:admin'])->group(function () {
         Route::delete('/{post}', [PostController::class, 'destroy'])->name('destroy');
         Route::post('/{post}/restore', [PostController::class, 'restore'])->name('restore');
         Route::post('/bulk-action', [PostController::class, 'bulkAction'])->name('bulk-action');
-        Route::post('/upload-image', [ImageUploadController::class, 'uploadContentImage'])->name('upload-image');
+        Route::post('/upload-image', [PostController::class, 'uploadImage'])->name('upload-image');
         Route::post('/delete-image', [ImageUploadController::class, 'deleteImage'])->name('delete-image');
     });
 
@@ -51,6 +52,18 @@ Route::middleware(['auth:admin'])->group(function () {
         Route::put('/{category}', [CategoryController::class, 'update'])->name('update');
         Route::delete('/{category}', [CategoryController::class, 'destroy'])->name('destroy');
         Route::post('/reorder', [CategoryController::class, 'reorder'])->name('reorder');
+    });
+
+    // 페이지 관리
+    Route::prefix('pages')->name('pages.')->group(function () {
+        Route::get('/', [PageController::class, 'index'])->name('index');
+        Route::get('/create', [PageController::class, 'create'])->name('create');
+        Route::post('/', [PageController::class, 'store'])->name('store');
+        Route::get('/{page}', [PageController::class, 'show'])->name('show');
+        Route::get('/{page}/edit', [PageController::class, 'edit'])->name('edit');
+        Route::put('/{page}', [PageController::class, 'update'])->name('update');
+        Route::delete('/{page}', [PageController::class, 'destroy'])->name('destroy');
+        Route::patch('/{page}/toggle-status', [PageController::class, 'toggleStatus'])->name('toggle-status');
     });
 
     // 댓글 관리

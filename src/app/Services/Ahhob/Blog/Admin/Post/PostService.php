@@ -3,76 +3,85 @@
 namespace App\Services\Ahhob\Blog\Admin\Post;
 
 use App\Services\Ahhob\Blog\Shared\Post\PostService as SharedPostService;
+use App\Traits\Blog\QueryBuilderTrait;
 use App\Models\Blog\Post;
 use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Http\Request;
 
+/**
+ * 관리자용 게시물 서비스
+ * 
+ * 이 서비스는 관리자 패널에서 게시물을 관리하는 기능을 제공합니다.
+ * 공통 쿼리 빌더 트레이트를 사용하여 코드 중복을 방지하고
+ * 일관된 쿼리 로직을 유지합니다.
+ * 
+ * 주요 기능:
+ * - 게시물 목록 조회 (모든 상태 포함)
+ * - 고급 필터링 및 정렬
+ * - 일괄 작업 처리
+ * - 통계 데이터 제공
+ */
 class PostService extends SharedPostService
 {
+    use QueryBuilderTrait;
+
     /**
      * 관리자용 게시물 목록 조회
-     * @param array $filters
-     * @return LengthAwarePaginator
+     * 
+     * 모든 상태의 게시물을 조회할 수 있으며, 다양한 필터링 옵션을 제공합니다.
+     * 
+     * @param array $filters 필터 옵션
+     * @return LengthAwarePaginator 페이지네이션된 게시물 목록
      */
     public function getPosts(array $filters = []): LengthAwarePaginator
     {
-        $query = Post::with(['user', 'category', 'tags']);
+        $query = Post::query();
 
-        // 상태 필터
-        if (isset($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
+        // 공통 필터 적용
+        $query = $this->applyCommonFilters($query, $filters);
 
-        // 작성자 필터
-        if (isset($filters['author_id'])) {
-            $query->where('user_id', $filters['author_id']);
-        }
+        // 삭제된 항목 포함 여부 (관리자는 삭제된 항목도 볼 수 있음)
+        $query = $this->applyTrashedScope($query, $filters['include_trashed'] ?? false);
 
-        // 카테고리 필터
-        if (isset($filters['category_id'])) {
-            $query->where('category_id', $filters['category_id']);
-        }
+        // 관계 즉시 로딩
+        $query = $this->applyEagerLoading($query, ['tags'], true);
 
-        // 검색
-        if (isset($filters['search'])) {
-            $searchTerm = $filters['search'];
-            $query->where(function ($q) use ($searchTerm) {
-                $q->where('title', 'like', "%{$searchTerm}%")
-                    ->orWhere('content', 'like', "%{$searchTerm}%");
-            });
-        }
+        // 정렬 적용 (관리자용 확장된 정렬 옵션)
+        $allowedSortFields = [
+            'created_at', 'updated_at', 'published_at', 'title', 
+            'views_count', 'likes_count', 'comments_count', 
+            'author', 'category', 'status'
+        ];
+        $query = $this->applySorting($query, $filters, $allowedSortFields, 'updated_at', 'desc');
 
-        // 기간 필터
-        if (isset($filters['date_from'])) {
-            $query->whereDate('created_at', '>=', $filters['date_from']);
-        }
+        // 페이지네이션 적용
+        return $this->applyPagination(
+            $query, 
+            $filters, 
+            config('ahhob_blog.pagination.admin_per_page', 20),
+            100
+        );
+    }
 
-        if (isset($filters['date_to'])) {
-            $query->whereDate('created_at', '<=', $filters['date_to']);
-        }
+    /**
+     * Request 객체로부터 게시물 목록 조회
+     * 
+     * @param Request $request HTTP 요청
+     * @return LengthAwarePaginator 페이지네이션된 게시물 목록
+     */
+    public function getPostsFromRequest(Request $request): LengthAwarePaginator
+    {
+        $allowedFilters = [
+            'search', 'status', 'author_id', 'category_id', 'tag_ids',
+            'date_from', 'date_to', 'is_featured', 'allow_comments',
+            'sort', 'sort_dir', 'per_page', 'include_trashed'
+        ];
 
-        // 정렬
-        $sortBy = $filters['sort'] ?? 'latest';
-        $sortDir = $filters['sort_dir'] ?? 'desc';
+        $filters = $this->extractFiltersFromRequest($request, $allowedFilters);
+        $filters = $this->cleanFilters($filters);
 
-        switch ($sortBy) {
-            case 'title':
-                $query->orderBy('title', $sortDir);
-                break;
-            case 'views':
-                $query->orderBy('views_count', $sortDir);
-                break;
-            case 'comments':
-                $query->orderBy('comments_count', $sortDir);
-                break;
-            case 'status':
-                $query->orderBy('status', $sortDir);
-                break;
-            default:
-                $query->orderBy('created_at', $sortDir);
-        }
-
-        return $query->paginate(config('ahhob.pagination.admin_per_page'));
+        return $this->getPosts($filters);
     }
 
     /**
@@ -132,6 +141,21 @@ class PostService extends SharedPostService
         }
 
         return $result;
+    }
+
+    /**
+     * 본문 이미지 업로드
+     * @param \Illuminate\Http\UploadedFile $file
+     * @return string
+     */
+    public function uploadContentImage($file): string
+    {
+        $filename = uniqid() . '.' . $file->getClientOriginalExtension();
+        $path = 'uploads/posts/content/' . date('Y/m');
+        
+        $file->storeAs($path, $filename, 'public');
+        
+        return $path . '/' . $filename;
     }
 
     /**

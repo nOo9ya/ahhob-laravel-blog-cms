@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Ahhob\Blog\Admin\Post;
 
+use App\Traits\Blog\RequestValidationTrait;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -10,6 +11,7 @@ use Illuminate\Support\Str;
 
 class PostRequest extends FormRequest
 {
+    use RequestValidationTrait;
     /**
      * 요청에 대한 권한을 확인합니다.
      * 생성(store)과 수정(update) 시나리오를 모두 처리합니다.
@@ -35,43 +37,26 @@ class PostRequest extends FormRequest
         // 수정 시에는 해당 post의 id를, 생성 시에는 null을 사용합니다.
         $postId = $this->route('post')?->id;
 
-        return [
+        return array_merge($this->getCommonRules(), [
             'title' => 'required|string|max:255',
-            'slug' => [
-                'nullable',
-                'string',
-                'max:255',
-                // 수정 시에는 현재 포스트의 slug는 중복 검사에서 제외합니다.
-                Rule::unique('posts', 'slug')->ignore($postId),
-                'regex:/^[a-z0-9-]+$/',
-            ],
+            'slug' => $this->getSlugRules('posts', $postId),
             'content' => 'required|string|min:100',
             'excerpt' => 'nullable|string|max:500',
             'category_id' => 'required|exists:categories,id',
             'status' => 'required|in:draft,published,archived',
-            'featured_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
-            'is_featured' => 'nullable|boolean',
-            'allow_comments' => 'nullable|boolean',
+            'featured_image' => $this->getOptionalImageRules(5120),
+            'og_image' => $this->getOptionalImageRules(2048),
+            
             // 생성 시에만 'after_or_equal' 규칙을 적용합니다.
-            'published_at' => $this->isMethod('post')
+            'published_at' => $this->isCreateRequest()
                 ? 'nullable|date|after_or_equal:now'
                 : 'nullable|date',
 
-            // SEO 정보
-            'meta_title' => 'nullable|string|max:60',
-            'meta_description' => 'nullable|string|max:160',
-            'og_title' => 'nullable|string|max:60',
-            'og_description' => 'nullable|string|max:200',
-            'og_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+            // SEO 키워드
             'meta_keywords' => 'nullable|array|max:10',
             'meta_keywords.*' => 'string|max:50',
-            'canonical_url' => 'nullable|url|max:255',
-            'index_follow' => 'nullable|boolean',
-
-            // 태그
-            'tags' => 'nullable|array|max:20',
-            'tags.*' => 'string|max:50',
-        ];
+            
+        ], $this->getTagRules());
     }
 
     /**

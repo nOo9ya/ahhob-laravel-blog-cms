@@ -1,7 +1,9 @@
 <?php
 
-namespace App\Services\Ahhob\Blog\Shared;
+namespace App\Services\Ahhob\Blog\Shared\Post;
 
+use App\Traits\Blog\QueryBuilderTrait;
+use App\Services\Ahhob\Blog\Shared\MarkdownService;
 use App\Models\Blog\Post;
 use App\Models\Blog\Category;
 use App\Models\Blog\Tag;
@@ -10,9 +12,25 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
+/**
+ * 공유 게시물 서비스 - 모든 모드에서 사용되는 기본 CRUD 로직
+ * 
+ * 이 서비스는 Admin, Web, API 서비스의 부모 클래스로,
+ * 공통된 게시물 생성, 수정, 삭제 로직을 제공합니다.
+ * QueryBuilderTrait를 사용하여 중복 코드를 방지합니다.
+ * 
+ * 주요 기능:
+ * - 게시물 CRUD 작업
+ * - 이미지 업로드 및 관리
+ * - 태그 동기화
+ * - 슬러그 생성
+ * - 마크다운 처리
+ */
 class PostService
 {
-    private MarkdownService $markdownService;
+    use QueryBuilderTrait;
+    
+    protected MarkdownService $markdownService;
 
     public function __construct(MarkdownService $markdownService)
     {
@@ -20,9 +38,12 @@ class PostService
     }
 
     /**
-     * 게시물 생성
+     * 게시물 생성 (모든 모드에서 공통 사용)
+     * 
+     * @param array $data 게시물 데이터
+     * @return Post 생성된 게시물
      */
-    public function create(array $data): Post
+    public function createPost(array $data, ?UploadedFile $featuredImage = null, ?UploadedFile $ogImage = null): Post
     {
         // 슬러그 생성
         if (empty($data['slug'])) {
@@ -58,12 +79,12 @@ class PostService
         $post = Post::create($data);
 
         // 이미지 업로드 처리
-        if (isset($data['featured_image'])) {
-            $this->uploadFeaturedImage($post, $data['featured_image']);
+        if ($featuredImage) {
+            $this->uploadFeaturedImage($post, $featuredImage);
         }
 
-        if (isset($data['og_image'])) {
-            $this->uploadOgImage($post, $data['og_image']);
+        if ($ogImage) {
+            $this->uploadOgImage($post, $ogImage);
         }
 
         // 태그 처리
@@ -75,9 +96,15 @@ class PostService
     }
 
     /**
-     * 게시물 업데이트
+     * 게시물 업데이트 (모든 모드에서 공통 사용)
+     * 
+     * @param Post $post 수정할 게시물
+     * @param array $data 수정 데이터
+     * @param UploadedFile|null $featuredImage 대표 이미지 파일
+     * @param UploadedFile|null $ogImage OG 이미지 파일
+     * @return Post 수정된 게시물
      */
-    public function update(Post $post, array $data): Post
+    public function updatePost(Post $post, array $data, ?UploadedFile $featuredImage = null, ?UploadedFile $ogImage = null): Post
     {
         // 슬러그 생성 (변경된 경우만)
         if (isset($data['title']) && ($data['slug'] === null || $data['slug'] !== $post->slug)) {
@@ -115,12 +142,12 @@ class PostService
         $post->update($data);
 
         // 이미지 업로드 처리
-        if (isset($data['featured_image'])) {
-            $this->uploadFeaturedImage($post, $data['featured_image']);
+        if ($featuredImage) {
+            $this->uploadFeaturedImage($post, $featuredImage);
         }
 
-        if (isset($data['og_image'])) {
-            $this->uploadOgImage($post, $data['og_image']);
+        if ($ogImage) {
+            $this->uploadOgImage($post, $ogImage);
         }
 
         // 태그 처리
@@ -164,16 +191,26 @@ class PostService
     }
 
     /**
-     * 태그 동기화
+     * 태그 동기화 (문자열 또는 배열 모두 지원)
+     * 
+     * @param Post $post 게시물
+     * @param string|array $tags 태그 데이터
+     * @return void
      */
-    private function syncTags(Post $post, string $tagsString): void
+    protected function syncTags(Post $post, $tags): void
     {
-        if (empty($tagsString)) {
+        if (empty($tags)) {
             $post->tags()->detach();
             return;
         }
 
-        $tagNames = array_map('trim', explode(',', $tagsString));
+        // 문자열인 경우 배열로 변환
+        if (is_string($tags)) {
+            $tagNames = array_map('trim', explode(',', $tags));
+        } else {
+            $tagNames = is_array($tags) ? $tags : [];
+        }
+        
         $tagIds = [];
 
         foreach ($tagNames as $tagName) {
@@ -191,8 +228,12 @@ class PostService
 
     /**
      * 고유한 슬러그 생성
+     * 
+     * @param string $title 제목
+     * @param int|null $excludeId 제외할 게시물 ID (수정 시)
+     * @return string 생성된 슬러그
      */
-    private function generateSlug(string $title, ?int $excludeId = null): string
+    protected function generateSlug(string $title, ?int $excludeId = null): string
     {
         $baseSlug = Str::slug($title);
         $slug = $baseSlug;
@@ -218,8 +259,12 @@ class PostService
 
     /**
      * 고유한 파일명 생성
+     * 
+     * @param UploadedFile $file 업로드된 파일
+     * @param string $prefix 파일명 접두사
+     * @return string 생성된 파일명
      */
-    private function generateUniqueFilename(UploadedFile $file, string $prefix = ''): string
+    protected function generateUniqueFilename(UploadedFile $file, string $prefix = ''): string
     {
         $extension = $file->getClientOriginalExtension();
         $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
@@ -236,9 +281,12 @@ class PostService
     }
 
     /**
-     * 게시물 삭제
+     * 게시물 삭제 (관련 파일도 함께 삭제)
+     * 
+     * @param Post $post 삭제할 게시물
+     * @return bool 삭제 성공 여부
      */
-    public function delete(Post $post): bool
+    public function deletePost(Post $post): bool
     {
         // 관련 이미지 삭제
         if ($post->featured_image) {
@@ -253,112 +301,6 @@ class PostService
         return $post->delete();
     }
 
-    /**
-     * 게시물 목록 조회 (관리자용)
-     */
-    public function getPostsForAdmin(array $filters = [], int $perPage = 15)
-    {
-        $query = Post::with(['category', 'user', 'tags'])
-            ->withCount('comments');
-
-        // 필터 적용
-        if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (!empty($filters['category_id'])) {
-            $query->where('category_id', $filters['category_id']);
-        }
-
-        if (!empty($filters['search'])) {
-            $query->where(function ($q) use ($filters) {
-                $q->where('title', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('content', 'like', '%' . $filters['search'] . '%');
-            });
-        }
-
-        return $query->orderBy('created_at', 'desc')->paginate($perPage);
-    }
-
-    /**
-     * 발행된 게시물 목록 조회 (웹용)
-     */
-    public function getPublishedPosts(array $filters = [], int $perPage = 10)
-    {
-        $query = Post::published()
-            ->with(['category', 'user', 'tags'])
-            ->withCount('comments');
-
-        // 필터 적용
-        if (!empty($filters['category_id'])) {
-            $query->where('category_id', $filters['category_id']);
-        }
-
-        if (!empty($filters['tag_id'])) {
-            $query->whereHas('tags', function ($q) use ($filters) {
-                $q->where('tags.id', $filters['tag_id']);
-            });
-        }
-
-        if (!empty($filters['search'])) {
-            $query->where(function ($q) use ($filters) {
-                $q->where('title', 'like', '%' . $filters['search'] . '%')
-                    ->orWhere('excerpt', 'like', '%' . $filters['search'] . '%');
-            });
-        }
-
-        // 정렬: 고정 게시물 우선, 그 다음 발행일 역순
-        return $query->orderBy('is_pinned', 'desc')
-            ->orderBy('published_at', 'desc')
-            ->paginate($perPage);
-    }
-
-    /**
-     * 인기 게시물 조회
-     */
-    public function getPopularPosts(int $limit = 5)
-    {
-        return Post::published()
-            ->with(['category'])
-            ->withCount('views')
-            ->orderBy('views_count', 'desc')
-            ->orderBy('published_at', 'desc')
-            ->limit($limit)
-            ->get();
-    }
-
-    /**
-     * 최근 게시물 조회
-     */
-    public function getRecentPosts(int $limit = 5, ?int $excludeId = null)
-    {
-        $query = Post::published()
-            ->with(['category'])
-            ->orderBy('published_at', 'desc');
-
-        if ($excludeId) {
-            $query->where('id', '!=', $excludeId);
-        }
-
-        return $query->limit($limit)->get();
-    }
-
-    /**
-     * 관련 게시물 조회
-     */
-    public function getRelatedPosts(Post $post, int $limit = 3)
-    {
-        $query = Post::published()
-            ->where('id', '!=', $post->id)
-            ->with(['category']);
-
-        // 같은 카테고리의 게시물 우선
-        if ($post->category_id) {
-            $query->where('category_id', $post->category_id);
-        }
-
-        return $query->orderBy('published_at', 'desc')
-            ->limit($limit)
-            ->get();
-    }
+    // 이전 중복 메서드들은 제거됨
+    // 각 서비스(Admin, Web, API)에서 QueryBuilderTrait를 사용하여 구현
 }

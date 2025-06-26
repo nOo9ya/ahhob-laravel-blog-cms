@@ -2,6 +2,7 @@
 
 namespace App\Models\Blog;
 
+use App\Services\Ahhob\Blog\Shared\CacheService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -44,37 +45,75 @@ class Category extends Model
     ];
 
     /**
-     * The "booted" method of the model.
+     * 모델 부팅 - 이벤트 리스너 등록
+     * 
+     * 카테고리 생성, 수정, 삭제 시 자동으로 실행되는 로직을 정의합니다.
+     * - 계층 구조 경로 자동 계산
+     * - 하위 카테고리 수 업데이트
+     * - 캐시 무효화
+     * - 부모-자식 관계 정리
      */
     protected static function boot(): void
     {
         parent::boot();
 
-        // 생성될 때 경로 업데이트
-        static::created(function ($category) {
+        // 생성 전 처리
+        static::creating(function (Category $category) {
+            // 캐시 무효화
+            $category->invalidateCache();
+        });
+
+        // 생성 후 처리
+        static::created(function (Category $category) {
+            // 경로 및 깊이 계산
             $category->updatePath();
+            
+            // 부모 카테고리의 하위 수 업데이트
             if ($category->parent) {
                 $category->parent->updateChildrenCount();
             }
         });
 
-        // 업데이트될 때 경로 재계산 (parent_id 변경 시)
-        static::updated(function ($category) {
+        // 수정 전 처리
+        static::updating(function (Category $category) {
+            // 캐시 무효화
+            $category->invalidateCache();
+        });
+
+        // 수정 후 처리
+        static::updated(function (Category $category) {
+            // 부모가 변경된 경우 경로 재계산
             if ($category->wasChanged('parent_id')) {
                 $category->updatePath();
 
-                // 이전 부모와 새 부모의 children_count 업데이트
-                if ($category->getOriginal('parent_id')) {
-                    Category::find($category->getOriginal('parent_id'))->updateChildrenCount();
+                // 이전 부모의 하위 수 업데이트
+                $originalParentId = $category->getOriginal('parent_id');
+                if ($originalParentId) {
+                    $originalParent = Category::find($originalParentId);
+                    if ($originalParent) {
+                        $originalParent->updateChildrenCount();
+                    }
                 }
+                
+                // 새 부모의 하위 수 업데이트
                 if ($category->parent) {
                     $category->parent->updateChildrenCount();
                 }
             }
         });
 
-        // 삭제될 때 부모의 children_count 업데이트
-        static::deleted(function ($category) {
+        // 삭제 전 처리
+        static::deleting(function (Category $category) {
+            // 캐시 무효화
+            $category->invalidateCache();
+            
+            // 하위 카테고리들 처리 (부모를 null로 설정하거나 다른 부모로 이동)
+            $category->children()->update(['parent_id' => $category->parent_id]);
+        });
+
+        // 삭제 후 처리
+        static::deleted(function (Category $category) {
+            // 부모의 하위 수 업데이트
             if ($category->parent) {
                 $category->parent->updateChildrenCount();
             }
@@ -133,24 +172,34 @@ class Category extends Model
 
     /**
      * 최상위 카테고리들만 조회
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeRoots($query)
+    public function scopeRoots(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         return $query->whereNull('parent_id');
     }
 
     /**
      * 활성화된 카테고리들만 조회
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeActive($query)
+    public function scopeActive(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('is_active', true);
     }
 
     /**
      * 특정 깊이의 카테고리들만 조회
+     * 
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param int $depth 조회할 깊이
+     * @return \Illuminate\Database\Eloquent\Builder
      */
-    public function scopeByDepth($query, int $depth)
+    public function scopeByDepth(\Illuminate\Database\Eloquent\Builder $query, int $depth): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('depth', $depth);
     }
@@ -174,6 +223,31 @@ class Category extends Model
         }
 
         return $this->parent->full_name . ' > ' . $this->name;
+    }
+
+    // endregion
+
+    // 중복된 boot 메서드가 제거되었습니다. 위의 통합된 boot 메서드를 사용합니다.
+
+    /*
+    |--------------------------------------------------------------------------
+    | 캐시 관련 메서드
+    |--------------------------------------------------------------------------
+    */
+    // region --- 캐시 관련 메서드 ---
+
+    /**
+     * 카테고리 관련 캐시 무효화
+     */
+    public function invalidateCache(): void
+    {
+        if (config('ahhob_blog.cache.auto_invalidate.on_category_save', true)) {
+            $cacheService = app(CacheService::class);
+            $cacheService->invalidateCategories();
+            
+            // 정적 콘텐츠 캐시 무효화 (RSS, Sitemap 등)
+            $cacheService->invalidateByTags(['static']);
+        }
     }
 
     // endregion
