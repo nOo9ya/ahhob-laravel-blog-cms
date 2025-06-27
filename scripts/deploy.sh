@@ -12,6 +12,12 @@ DOCKER_COMPOSE_FILE="$PROJECT_ROOT/docker-compose.yml"
 ENV_FILE="$PROJECT_ROOT/src/.env"
 BACKUP_DIR="$PROJECT_ROOT/backups"
 
+# Docker Compose command based on environment
+DOCKER_COMPOSE_COMMAND="docker-compose"
+if [[ "$ENVIRONMENT" == "production" ]]; then
+    DOCKER_COMPOSE_COMMAND="docker-compose -f $PROJECT_ROOT/docker-compose.production.yml"
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -135,6 +141,11 @@ check_prerequisites() {
         log_error "Docker Compose is not installed or not in PATH"
     fi
     
+    # Check if the production docker-compose file exists if in production environment
+    if [[ "$ENVIRONMENT" == "production" ]] && [[ ! -f "$PROJECT_ROOT/docker-compose.production.yml" ]]; then
+        log_error "Production Docker Compose file not found: $PROJECT_ROOT/docker-compose.production.yml. Please run production-setup.sh first."
+    fi
+    
     # Check if project files exist
     if [[ ! -f "$DOCKER_COMPOSE_FILE" ]]; then
         log_error "Docker Compose file not found: $DOCKER_COMPOSE_FILE"
@@ -203,11 +214,11 @@ create_backup() {
     cd "$PROJECT_ROOT"
     
     # Check if containers are running
-    if docker-compose ps | grep -q "Up"; then
+    if $DOCKER_COMPOSE_COMMAND ps | grep -q "Up"; then
         # Backup SQLite database
         if [[ -f "src/database/database.sqlite" ]]; then
             log_info "Backing up SQLite database"
-            docker-compose exec -T php sqlite3 /var/www/database/database.sqlite ".backup /var/www/storage/app/backup_$TIMESTAMP.sqlite"
+            $DOCKER_COMPOSE_COMMAND exec -T php sqlite3 /var/www/database/database.sqlite ".backup /var/www/storage/app/backup_$TIMESTAMP.sqlite"
         fi
         
         # Backup uploaded files
@@ -238,20 +249,20 @@ run_tests() {
     log_info "Running tests..."
     
     # Ensure containers are running
-    docker-compose up -d
+    $DOCKER_COMPOSE_COMMAND up -d
     
     # Wait for containers to be ready
     sleep 10
     
     # Run PHPUnit tests
     log_info "Running PHP unit tests"
-    if ! docker-compose exec -T php vendor/bin/phpunit; then
+    if ! $DOCKER_COMPOSE_COMMAND exec -T php vendor/bin/phpunit; then
         log_error "PHP tests failed. Deployment aborted."
     fi
     
     # Run specific JWT tests
     log_info "Running JWT authentication tests"
-    if ! docker-compose exec -T php vendor/bin/phpunit --testsuite=Unit --filter=Jwt; then
+    if ! $DOCKER_COMPOSE_COMMAND exec -T php vendor/bin/phpunit --testsuite=Unit --filter=Jwt; then
         log_warning "Some JWT unit tests failed, but continuing deployment"
     fi
     
@@ -265,9 +276,9 @@ build_containers() {
     
     if [[ "$FORCE_REBUILD" == true ]]; then
         log_info "Force rebuilding containers"
-        docker-compose build --no-cache
+        $DOCKER_COMPOSE_COMMAND build --no-cache
     else
-        docker-compose build
+        $DOCKER_COMPOSE_COMMAND build
     fi
     
     log_success "Docker containers built successfully"
@@ -280,11 +291,11 @@ deploy_application() {
     
     # Stop existing containers
     log_info "Stopping existing containers"
-    docker-compose down
+    $DOCKER_COMPOSE_COMMAND down
     
     # Start containers
     log_info "Starting containers"
-    docker-compose up -d
+    $DOCKER_COMPOSE_COMMAND up -d
     
     # Wait for containers to be ready
     log_info "Waiting for containers to be ready"
@@ -292,28 +303,28 @@ deploy_application() {
     
     # Run database migrations
     log_info "Running database migrations"
-    docker-compose exec -T php php artisan migrate --force
+    $DOCKER_COMPOSE_COMMAND exec -T php php artisan migrate --force
     
     # Clear and optimize caches
     log_info "Optimizing application"
-    docker-compose exec -T php php artisan config:clear
-    docker-compose exec -T php php artisan route:clear
-    docker-compose exec -T php php artisan view:clear
+    $DOCKER_COMPOSE_COMMAND exec -T php php artisan config:clear
+    $DOCKER_COMPOSE_COMMAND exec -T php php artisan route:clear
+    $DOCKER_COMPOSE_COMMAND exec -T php php artisan view:clear
     
     if [[ "$ENVIRONMENT" == "production" ]]; then
         log_info "Caching configuration for production"
-        docker-compose exec -T php php artisan config:cache
-        docker-compose exec -T php php artisan route:cache
-        docker-compose exec -T php php artisan view:cache
+        $DOCKER_COMPOSE_COMMAND exec -T php php artisan config:cache
+        $DOCKER_COMPOSE_COMMAND exec -T php php artisan route:cache
+        $DOCKER_COMPOSE_COMMAND exec -T php php artisan view:cache
     fi
     
     # Create storage symlink
-    docker-compose exec -T php php artisan storage:link
+    $DOCKER_COMPOSE_COMMAND exec -T php php artisan storage:link
     
     # Set proper permissions
     log_info "Setting file permissions"
-    docker-compose exec -T php chown -R noo9ya:noo9ya /var/www/storage
-    docker-compose exec -T php chown -R noo9ya:noo9ya /var/www/bootstrap/cache
+    $DOCKER_COMPOSE_COMMAND exec -T php chown -R noo9ya:noo9ya /var/www/storage
+    $DOCKER_COMPOSE_COMMAND exec -T php chown -R noo9ya:noo9ya /var/www/bootstrap/cache
     
     log_success "Application deployed successfully"
 }
@@ -322,7 +333,7 @@ verify_deployment() {
     log_info "Verifying deployment..."
     
     # Check if containers are running
-    if ! docker-compose ps | grep -q "Up"; then
+    if ! $DOCKER_COMPOSE_COMMAND ps | grep -q "Up"; then
         log_error "Some containers are not running"
     fi
     
@@ -355,12 +366,12 @@ show_deployment_info() {
     echo "  API URL: http://localhost/api"
     echo ""
     log_info "Container Status:"
-    docker-compose ps
+    $DOCKER_COMPOSE_COMMAND ps
     echo ""
     log_info "Application Logs:"
-    echo "  docker-compose logs -f php    # PHP application logs"
-    echo "  docker-compose logs -f nginx  # Web server logs"
-    echo "  docker-compose logs -f redis  # Redis logs"
+    echo "  $DOCKER_COMPOSE_COMMAND logs -f php    # PHP application logs"
+    echo "  $DOCKER_COMPOSE_COMMAND logs -f nginx  # Web server logs"
+    echo "  $DOCKER_COMPOSE_COMMAND logs -f redis  # Redis logs"
     echo ""
     log_success "Deployment completed successfully!"
 }

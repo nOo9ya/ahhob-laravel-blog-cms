@@ -57,7 +57,7 @@ APP_ENV=production
 APP_KEY=base64:REPLACE_WITH_GENERATED_KEY
 APP_DEBUG=false
 APP_TIMEZONE=UTC
-APP_URL=https://yourdomain.com
+APP_URL=REPLACE_WITH_APP_URL
 
 APP_LOCALE=en
 APP_FALLBACK_LOCALE=en
@@ -83,10 +83,10 @@ LOG_LEVEL=error
 
 # Database - Production (MySQL/PostgreSQL recommended)
 DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
+DB_HOST=REPLACE_WITH_DB_HOST
 DB_PORT=3306
-DB_DATABASE=ahhob_blog_production
-DB_USERNAME=ahhob_user
+DB_DATABASE=REPLACE_WITH_DB_DATABASE
+DB_USERNAME=REPLACE_WITH_DB_USERNAME
 DB_PASSWORD=REPLACE_WITH_DB_PASSWORD
 
 # Alternative PostgreSQL Configuration
@@ -102,7 +102,7 @@ SESSION_DRIVER=redis
 SESSION_LIFETIME=120
 SESSION_ENCRYPT=true
 SESSION_PATH=/
-SESSION_DOMAIN=.yourdomain.com
+SESSION_DOMAIN=REPLACE_WITH_SESSION_DOMAIN
 SESSION_SECURE_COOKIES=true
 SESSION_SAME_SITE=strict
 
@@ -185,12 +185,12 @@ REDIS_SESSION_DB=2
 
 # Mail - Production SMTP
 MAIL_MAILER=smtp
-MAIL_HOST=smtp.yourdomain.com
+MAIL_HOST=REPLACE_WITH_MAIL_HOST
 MAIL_PORT=587
-MAIL_USERNAME=noreply@yourdomain.com
-MAIL_PASSWORD=REPLACE_WITH_EMAIL_PASSWORD
+MAIL_USERNAME=REPLACE_WITH_MAIL_USERNAME
+MAIL_PASSWORD=REPLACE_WITH_MAIL_PASSWORD
 MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=noreply@yourdomain.com
+MAIL_FROM_ADDRESS=REPLACE_WITH_MAIL_FROM_ADDRESS
 MAIL_FROM_NAME="${APP_NAME}"
 
 # AWS S3 - Production File Storage
@@ -209,7 +209,7 @@ VITE_APP_NAME="${APP_NAME}"
 GA_ENABLED=true
 GA_MEASUREMENT_ID=G-XXXXXXXXXX
 GA_ANONYMIZE_IP=true
-GA_COOKIE_DOMAIN=.yourdomain.com
+GA_COOKIE_DOMAIN=REPLACE_WITH_GA_COOKIE_DOMAIN
 GA_COOKIE_EXPIRES=63072000
 
 GTM_ENABLED=true
@@ -312,13 +312,47 @@ SECURITY_REPORT_FREQUENCY=daily
 SECURITY_REPORT_RECIPIENTS="admin@yourdomain.com"
 EOF
 
+    # Prompt for user input
+    read -p "Enter your application URL (e.g., https://yourdomain.com): " APP_URL_INPUT
+    read -p "Enter your database host (e.g., 127.0.0.1 or your_db_host): " DB_HOST_INPUT
+    read -p "Enter your database name: " DB_DATABASE_INPUT
+    read -p "Enter your database username: " DB_USERNAME_INPUT
+    read -s -p "Enter your database password: " DB_PASSWORD_INPUT
+    echo
+    read -s -p "Enter your Redis password (leave blank if none): " REDIS_PASSWORD_INPUT
+    echo
+    read -p "Enter your mail host (e.g., smtp.mailgun.org): " MAIL_HOST_INPUT
+    read -p "Enter your mail username (e.g., postmaster@yourdomain.com): " MAIL_USERNAME_INPUT
+    read -s -p "Enter your mail password: " MAIL_PASSWORD_INPUT
+    echo
+    read -p "Enter your mail from address (e.g., noreply@yourdomain.com): " MAIL_FROM_ADDRESS_INPUT
+    read -p "Enter your AWS Access Key ID (leave blank if not using S3): " AWS_KEY_INPUT
+    read -s -p "Enter your AWS Secret Access Key (leave blank if not using S3): " AWS_SECRET_INPUT
+    echo
+    read -p "Enter your session domain (e.g., .yourdomain.com): " SESSION_DOMAIN_INPUT
+    read -p "Enter your Google Analytics cookie domain (e.g., .yourdomain.com): " GA_COOKIE_DOMAIN_INPUT
+
     # Generate secure keys
     APP_KEY=$(generate_secure_key)
     JWT_SECRET=$(generate_jwt_secret)
     
-    # Replace placeholders with generated values
-    sed -i.bak "s/REPLACE_WITH_GENERATED_KEY/$APP_KEY/g" "$ENV_PRODUCTION_FILE"
-    sed -i.bak "s/REPLACE_WITH_JWT_SECRET/$JWT_SECRET/g" "$ENV_PRODUCTION_FILE"
+    # Replace placeholders with generated values and user input
+    sed -i.bak "s|REPLACE_WITH_GENERATED_KEY|$APP_KEY|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_JWT_SECRET|$JWT_SECRET|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_APP_URL|$APP_URL_INPUT|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_DB_HOST|$DB_HOST_INPUT|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_DB_DATABASE|$DB_DATABASE_INPUT|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_DB_USERNAME|$DB_USERNAME_INPUT|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_DB_PASSWORD|$DB_PASSWORD_INPUT|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_REDIS_PASSWORD|$REDIS_PASSWORD_INPUT|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_MAIL_HOST|$MAIL_HOST_INPUT|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_MAIL_USERNAME|$MAIL_USERNAME_INPUT|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_MAIL_PASSWORD|$MAIL_PASSWORD_INPUT|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_MAIL_FROM_ADDRESS|$MAIL_FROM_ADDRESS_INPUT|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_AWS_KEY|$AWS_KEY_INPUT|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_AWS_SECRET|$AWS_SECRET_INPUT|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_SESSION_DOMAIN|$SESSION_DOMAIN_INPUT|g" "$ENV_PRODUCTION_FILE"
+    sed -i.bak "s|REPLACE_WITH_GA_COOKIE_DOMAIN|$GA_COOKIE_DOMAIN_INPUT|g" "$ENV_PRODUCTION_FILE"
     
     # Clean up backup file
     rm -f "$ENV_PRODUCTION_FILE.bak"
